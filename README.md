@@ -4,10 +4,10 @@ An enterprise-grade, event-driven e-commerce microservices platform built on AWS
 ---
 
 ## 📐 Activity Diagram
-<img src="./Project2 E-com Microservice-Order Activity.drawio.png" alt="Activity Diagram"/>
+<img src="./images/Project2 E-com Microservice-Order Activity.drawio.png" alt="Activity Diagram"/>
 
 ## 📐 System Architecture Diagram
-<img src="./Project2 E-com Microservice-AWS Architecture.drawio.png" alt="System Architecture Diagram"/>
+<img src="./images/Project2 E-com Microservice-AWS Architecture.drawio.png" alt="System Architecture Diagram"/>
 
 ---
 
@@ -31,3 +31,10 @@ An enterprise-grade, event-driven e-commerce microservices platform built on AWS
 - **Backend:** Python, Boto3
 - **Frontend:** React, Vite, JavaScript
 - **Architecture:** Microservices, Event-Driven, Saga Pattern, IaC
+
+---
+
+## 📺 Screenshots
+<img src="./images/order processing.png" alt="Processing order"/>
+
+<img src="./images/order completed.png" alt="Order completed"/>
