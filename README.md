@@ -3,9 +3,11 @@ An enterprise-grade, event-driven e-commerce microservices platform built on AWS
 
 ---
 
+## 📐 Activity Diagram Diagram
+![https://drive.google.com/file/d/1n6X5Eu8B7J1kjk9ydyTyXtehWmGwcoJ0/view?usp=share_link]
+
 ## 📐 System Architecture Diagram
-*(請把你的 AWS 架構圖截圖或圖片檔案上傳到專案中，並在此處插入圖片)*
-![Architecture Diagram](./architecture.png)
+![https://drive.google.com/file/d/17NWeXtfEKl1-LwZvEWPDJC-ZMebQQvYd/view?usp=share_link]
 
 ---
 
