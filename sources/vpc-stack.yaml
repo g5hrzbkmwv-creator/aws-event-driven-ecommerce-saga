@@ -1,0 +1,154 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: Microservices Shared VPC Network Stack
+
+Resources:
+  MicroservicesVPC:
+    Type: AWS::EC2::VPC
+    Properties:
+      CidrBlock: 10.0.0.0/16
+      EnableDnsHostnames: true
+      EnableDnsSupport: true
+      Tags:
+        - Key: Name
+          Value: microservices-vpc
+
+  InternetGateway:
+    Type: AWS::EC2::InternetGateway
+
+  VPCGatewayAttachment:
+    Type: AWS::EC2::VPCGatewayAttachment
+    Properties:
+      VpcId: !Ref MicroservicesVPC
+      InternetGatewayId: !Ref InternetGateway
+
+  PublicSubnet:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId: !Ref MicroservicesVPC
+      CidrBlock: 10.0.1.0/24
+      MapPublicIpOnLaunch: true
+      AvailabilityZone: !Select [0, !GetAZs '']
+      Tags:
+        - Key: Name
+          Value: microservices-public-subnet
+
+  PublicRouteTable:
+    Type: AWS::EC2::RouteTable
+    Properties:
+      VpcId: !Ref MicroservicesVPC
+
+  DefaultPublicRoute:
+    Type: AWS::EC2::Route
+    Properties:
+      RouteTableId: !Ref PublicRouteTable
+      DestinationCidrBlock: 0.0.0.0/0
+      GatewayId: !Ref InternetGateway
+
+  PublicSubnetRouteTableAssociation:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      SubnetId: !Ref PublicSubnet
+      RouteTableId: !Ref PublicRouteTable
+
+  # ==========================================
+  # 3. 專屬 Security Groups (各微服務獨立防護)
+  # ==========================================
+  OrderWorkerSG:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: Security group for Order Worker
+      VpcId: !Ref MicroservicesVPC
+      SecurityGroupEgress:
+        - IpProtocol: '-1'
+          CidrIp: 0.0.0.0/0
+      Tags:
+        - Key: Name
+          Value: order-worker-sg
+
+  InventoryWorkerSG:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: Security group for Inventory Worker
+      VpcId: !Ref MicroservicesVPC
+      SecurityGroupEgress:
+        - IpProtocol: '-1'
+          CidrIp: 0.0.0.0/0
+      Tags:
+        - Key: Name
+          Value: inventory-worker-sg
+
+  PaymentWorkerSG:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: Security group for Payment Worker
+      VpcId: !Ref MicroservicesVPC
+      SecurityGroupEgress:
+        - IpProtocol: '-1'
+          CidrIp: 0.0.0.0/0
+      Tags:
+        - Key: Name
+          Value: payment-worker-sg
+
+  NotificationWorkerSG:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: Security group for Notification Worker
+      VpcId: !Ref MicroservicesVPC
+      SecurityGroupEgress:
+        - IpProtocol: '-1'
+          CidrIp: 0.0.0.0/0
+      Tags:
+        - Key: Name
+          Value: notification-worker-sg
+
+  OrdersTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      TableName: Orders
+      BillingMode: PAY_PER_REQUEST  # 採用隨需付費 (On-Demand)，享受免預配與永久免費額度
+      AttributeDefinitions:
+        - AttributeName: order_id
+          AttributeType: S
+      KeySchema:
+        - AttributeName: order_id
+          KeyType: HASH  # Partition Key
+      Tags:
+        - Key: Project
+          Value: ECommMicroservices
+
+Outputs:
+  VpcId:
+    Description: VPC ID
+    Value: !Ref MicroservicesVPC
+    Export:
+      Name: ECommVpcId
+
+  PublicSubnetId:
+    Description: Public Subnet ID
+    Value: !Ref PublicSubnet
+    Export:
+      Name: ECommPublicSubnetId
+
+  OrderWorkerSGId:
+    Description: Security Group ID for Order Fargate Workers
+    Value: !Ref OrderWorkerSG
+    Export:
+      Name: ECommOrderWorkerSgId
+
+  InventoryWorkerSGId:
+    Description: Security Group ID for Inventory Fargate Workers
+    Value: !Ref InventoryWorkerSG
+    Export:
+      Name: ECommInventoryWorkerSgId
+
+  PaymentWorkerSGId:
+    Description: Security Group ID for Payment Fargate Workers
+    Value: !Ref PaymentWorkerSG
+    Export:
+      Name: ECommPaymentWorkerSgId
+
+  NotificationWorkerSGId:
+    Description: Security Group ID for Notification Fargate Workers
+    Value: !Ref PaymentWorkerSG
+    Export:
+      Name: ECommNotificationWorkerSgId

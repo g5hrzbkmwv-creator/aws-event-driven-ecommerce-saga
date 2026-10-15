@@ -1,0 +1,361 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: FinTech E-Commerce Microservices Event-Driven Messaging (Dedicated SQS per Event Type)
+
+Resources:
+  # ==========================================
+  # 1. SNS Topics (三大事件發布中心)
+  # ==========================================
+  OrderEventTopic:
+    Type: AWS::SNS::Topic
+    Properties:
+      TopicName: order-events-topic
+
+  InventoryEventTopic:
+    Type: AWS::SNS::Topic
+    Properties:
+      TopicName: inventory-events-topic
+
+  PaymentEventTopic:
+    Type: AWS::SNS::Topic
+    Properties:
+      TopicName: payment-events-topic
+
+  # ==========================================
+  # 2. Dead-Letter Queues (DLQ - 7條)
+  # ==========================================
+  OrderCreatedDLQ:
+    Type: AWS::SQS::Queue
+    Properties:
+      QueueName: order-created-dlq
+
+  OrderCompletedDLQ:
+    Type: AWS::SQS::Queue
+    Properties:
+      QueueName: order-completed-dlq
+
+  OrderCancelledDLQ:
+    Type: AWS::SQS::Queue
+    Properties:
+      QueueName: order-cancelled-dlq
+
+  InventoryReceivedDLQ:
+    Type: AWS::SQS::Queue
+    Properties:
+      QueueName: inventory-received-dlq
+
+  InventoryFailedDLQ:
+    Type: AWS::SQS::Queue
+    Properties:
+      QueueName: inventory-failed-dlq
+
+  PaymentSuccessDLQ:
+    Type: AWS::SQS::Queue
+    Properties:
+      QueueName: payment-success-dlq
+
+  PaymentFailedDLQ:
+    Type: AWS::SQS::Queue
+    Properties:
+      QueueName: payment-failed-dlq
+
+  # ==========================================
+  # Dead Letter Queue Alarm
+  # ==========================================
+  # 1. 建立一個專門收警報通知的 SNS Topic (可選，如果你們已經有通知用 SNS 可以共用)
+  AlarmNotificationTopic:
+    Type: AWS::SNS::Topic
+    Properties:
+      TopicName: 'ecommerce-dead-letter-alarm-topic'
+
+  EmailSubscription:
+    Type: AWS::SNS::Subscription
+    Properties:
+      TopicArn: !Ref AlarmNotificationTopic
+      Protocol: email
+      Endpoint: 'whitehole@me.com'  # 填入你的真實 Email
+
+  # 1. 新訂單服務 DLQ 警報
+  OrderDLQAlarm:
+    Type: AWS::CloudWatch::Alarm
+    Properties:
+      AlarmName: 'DLQ-Alert-Order'
+      Namespace: 'AWS/SQS'
+      MetricName: 'ApproximateNumberOfMessagesVisible'
+      Dimensions:
+        - Name: QueueName
+          Value: !GetAtt OrderCreatedDLQ.QueueName
+      Statistic: Sum
+      Period: 60
+      EvaluationPeriods: 1
+      Threshold: 0
+      ComparisonOperator: GreaterThanThreshold
+      AlarmActions: [!Ref AlarmNotificationTopic]
+
+  # 2. 庫存服務 DLQ 警報 
+  InventoryDLQAlarm:
+    Type: AWS::CloudWatch::Alarm
+    Properties:
+      AlarmName: 'DLQ-Alert-Inventory'
+      Namespace: 'AWS/SQS'
+      MetricName: 'ApproximateNumberOfMessagesVisible'
+      Dimensions:
+        - Name: QueueName
+          Value: !GetAtt InventoryReceivedDLQ.QueueName
+      Statistic: Sum
+      Period: 60
+      EvaluationPeriods: 1
+      Threshold: 0
+      ComparisonOperator: GreaterThanThreshold
+      AlarmActions: [!Ref AlarmNotificationTopic]
+
+  # 3. 付款服務 DLQ 警報
+  PaymentDLQAlarm:
+    Type: AWS::CloudWatch::Alarm
+    Properties:
+      AlarmName: 'DLQ-Alert-Payment'
+      Namespace: 'AWS/SQS'
+      MetricName: 'ApproximateNumberOfMessagesVisible'
+      Dimensions:
+        - Name: QueueName
+          Value: !GetAtt PaymentSuccessDLQ.QueueName
+      Statistic: Sum
+      Period: 60
+      EvaluationPeriods: 1
+      Threshold: 0
+      ComparisonOperator: GreaterThanThreshold
+      AlarmActions: [!Ref AlarmNotificationTopic]
+
+
+  # ==========================================
+  # 3. Main SQS Queues (7條專屬事件佇列)
+  # ==========================================
+  
+  # --- Order Event Queues ---
+  OrderCreatedQueue:
+    Type: AWS::SQS::Queue
+    Properties:
+      QueueName: order-created-queue
+      RedrivePolicy:
+        deadLetterTargetArn: !GetAtt OrderCreatedDLQ.Arn
+        maxReceiveCount: 3
+
+  OrderCompletedQueue:
+    Type: AWS::SQS::Queue
+    Properties:
+      QueueName: order-completed-queue
+      RedrivePolicy:
+        deadLetterTargetArn: !GetAtt OrderCompletedDLQ.Arn
+        maxReceiveCount: 3
+
+  OrderCancelledQueue:
+    Type: AWS::SQS::Queue
+    Properties:
+      QueueName: order-cancelled-queue
+      RedrivePolicy:
+        deadLetterTargetArn: !GetAtt OrderCancelledDLQ.Arn
+        maxReceiveCount: 3
+
+  # --- Inventory Event Queues ---
+  InventoryReceivedQueue:
+    Type: AWS::SQS::Queue
+    Properties:
+      QueueName: inventory-received-queue
+      RedrivePolicy:
+        deadLetterTargetArn: !GetAtt InventoryReceivedDLQ.Arn
+        maxReceiveCount: 3
+
+  InventoryFailedQueue:
+    Type: AWS::SQS::Queue
+    Properties:
+      QueueName: inventory-failed-queue
+      RedrivePolicy:
+        deadLetterTargetArn: !GetAtt InventoryFailedDLQ.Arn
+        maxReceiveCount: 3
+
+  # --- Payment Event Queues ---
+  PaymentSuccessQueue:
+    Type: AWS::SQS::Queue
+    Properties:
+      QueueName: payment-success-queue
+      RedrivePolicy:
+        deadLetterTargetArn: !GetAtt PaymentSuccessDLQ.Arn
+        maxReceiveCount: 3
+
+  PaymentFailedQueue:
+    Type: AWS::SQS::Queue
+    Properties:
+      QueueName: payment-failed-queue
+      RedrivePolicy:
+        deadLetterTargetArn: !GetAtt PaymentFailedDLQ.Arn
+        maxReceiveCount: 3
+
+  # ==========================================
+  # 4. SNS Subscriptions (透過 FilterPolicy 導流到對應 SQS)
+  # ==========================================
+
+  # Order Topic 導流
+  SubOrderCreated:
+    Type: AWS::SNS::Subscription
+    Properties:
+      TopicArn: !Ref OrderEventTopic
+      Protocol: sqs
+      Endpoint: !GetAtt OrderCreatedQueue.Arn
+      FilterPolicy:
+        event_type: [Created]
+
+  SubOrderCompleted:
+    Type: AWS::SNS::Subscription
+    Properties:
+      TopicArn: !Ref OrderEventTopic
+      Protocol: sqs
+      Endpoint: !GetAtt OrderCompletedQueue.Arn
+      FilterPolicy:
+        event_type: [Completed]
+
+  SubOrderCancelled:
+    Type: AWS::SNS::Subscription
+    Properties:
+      TopicArn: !Ref OrderEventTopic
+      Protocol: sqs
+      Endpoint: !GetAtt OrderCancelledQueue.Arn
+      FilterPolicy:
+        event_type: [Cancelled]
+
+  # Inventory Topic 導流
+  SubInventoryReceived:
+    Type: AWS::SNS::Subscription
+    Properties:
+      TopicArn: !Ref InventoryEventTopic
+      Protocol: sqs
+      Endpoint: !GetAtt InventoryReceivedQueue.Arn
+      FilterPolicy:
+        event_type: [Received]
+
+  SubInventoryFailed:
+    Type: AWS::SNS::Subscription
+    Properties:
+      TopicArn: !Ref InventoryEventTopic
+      Protocol: sqs
+      Endpoint: !GetAtt InventoryFailedQueue.Arn
+      FilterPolicy:
+        event_type: [Failed]
+
+  # Payment Topic 導流
+  SubPaymentSuccess:
+    Type: AWS::SNS::Subscription
+    Properties:
+      TopicArn: !Ref PaymentEventTopic
+      Protocol: sqs
+      Endpoint: !GetAtt PaymentSuccessQueue.Arn
+      FilterPolicy:
+        event_type: [Success]
+
+  SubPaymentFailed:
+    Type: AWS::SNS::Subscription
+    Properties:
+      TopicArn: !Ref PaymentEventTopic
+      Protocol: sqs
+      Endpoint: !GetAtt PaymentFailedQueue.Arn
+      FilterPolicy:
+        event_type: [Failed]
+
+  # ==========================================
+  # 5. SQS Access Policies (允許 SNS 寫入這 7 條 SQS)
+  # ==========================================
+  OrderCreatedQueuePolicy:
+    Type: AWS::SQS::QueuePolicy
+    Properties:
+      Queues: [!Ref OrderCreatedQueue]
+      PolicyDocument:
+        Statement:
+          - Sid: Allow-SNS
+            Effect: Allow
+            Principal: { Service: sns.amazonaws.com }
+            Action: sqs:SendMessage
+            Resource: !GetAtt OrderCreatedQueue.Arn
+            Condition: { ArnEquals: { aws:SourceArn: !Ref OrderEventTopic } }
+
+  OrderCompletedQueuePolicy:
+    Type: AWS::SQS::QueuePolicy
+    Properties:
+      Queues: [!Ref OrderCompletedQueue]
+      PolicyDocument:
+        Statement:
+          - Sid: Allow-SNS
+            Effect: Allow
+            Principal: { Service: sns.amazonaws.com }
+            Action: sqs:SendMessage
+            Resource: !GetAtt OrderCompletedQueue.Arn
+            Condition: { ArnEquals: { aws:SourceArn: !Ref OrderEventTopic } }
+
+  OrderCancelledQueuePolicy:
+    Type: AWS::SQS::QueuePolicy
+    Properties:
+      Queues: [!Ref OrderCancelledQueue]
+      PolicyDocument:
+        Statement:
+          - Sid: Allow-SNS
+            Effect: Allow
+            Principal: { Service: sns.amazonaws.com }
+            Action: sqs:SendMessage
+            Resource: !GetAtt OrderCancelledQueue.Arn
+            Condition: { ArnEquals: { aws:SourceArn: !Ref OrderEventTopic } }
+
+  InventoryReceivedQueuePolicy:
+    Type: AWS::SQS::QueuePolicy
+    Properties:
+      Queues: [!Ref InventoryReceivedQueue]
+      PolicyDocument:
+        Statement:
+          - Sid: Allow-SNS
+            Effect: Allow
+            Principal: { Service: sns.amazonaws.com }
+            Action: sqs:SendMessage
+            Resource: !GetAtt InventoryReceivedQueue.Arn
+            Condition: { ArnEquals: { aws:SourceArn: !Ref InventoryEventTopic } }
+
+  InventoryFailedQueuePolicy:
+    Type: AWS::SQS::QueuePolicy
+    Properties:
+      Queues: [!Ref InventoryFailedQueue]
+      PolicyDocument:
+        Statement:
+          - Sid: Allow-SNS
+            Effect: Allow
+            Principal: { Service: sns.amazonaws.com }
+            Action: sqs:SendMessage
+            Resource: !GetAtt InventoryFailedQueue.Arn
+            Condition: { ArnEquals: { aws:SourceArn: !Ref InventoryEventTopic } }
+
+  PaymentSuccessQueuePolicy:
+    Type: AWS::SQS::QueuePolicy
+    Properties:
+      Queues: [!Ref PaymentSuccessQueue]
+      PolicyDocument:
+        Statement:
+          - Sid: Allow-SNS
+            Effect: Allow
+            Principal: { Service: sns.amazonaws.com }
+            Action: sqs:SendMessage
+            Resource: !GetAtt PaymentSuccessQueue.Arn
+            Condition: { ArnEquals: { aws:SourceArn: !Ref PaymentEventTopic } }
+
+  PaymentFailedQueuePolicy:
+    Type: AWS::SQS::QueuePolicy
+    Properties:
+      Queues: [!Ref PaymentFailedQueue]
+      PolicyDocument:
+        Statement:
+          - Sid: Allow-SNS
+            Effect: Allow
+            Principal: { Service: sns.amazonaws.com }
+            Action: sqs:SendMessage
+            Resource: !GetAtt PaymentFailedQueue.Arn
+            Condition: { ArnEquals: { aws:SourceArn: !Ref PaymentEventTopic } } # 這裡微調對應 Topic
+
+Outputs:
+  OrderEventTopicArn:
+    Description: The ARN of the Order Events SNS Topic
+    Value: !Ref OrderEventTopic
+    Export:
+      Name: OrderEventTopicArn

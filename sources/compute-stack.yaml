@@ -1,0 +1,340 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: ECS Fargate Compute Stack for Inventory, Payment, and Order Workers
+
+Resources:
+  # ==========================================
+  # 1. ECS Cluster
+  # ==========================================
+  MicroservicesCluster:
+    Type: AWS::ECS::Cluster
+    Properties:
+      ClusterName: ecomm-microservices-cluster
+
+  # ==========================================
+  # 2. IAM Roles (執行與任務權限)
+  # ==========================================
+  ECSTaskExecutionRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: ecs-tasks.amazonaws.com
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/service-role/AmazonECSTaskExecutionRolePolicy
+
+  MicroservicesTaskRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: ecs-tasks.amazonaws.com
+            Action: sts:AssumeRole
+      Policies:
+        - PolicyName: SqsSnsFullAccessPolicy
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - sqs:ReceiveMessage
+                  - sqs:DeleteMessage
+                  - sqs:GetQueueAttributes
+                  - sqs:GetQueueUrl
+                  - sqs:SendMessage
+                  - sns:Publish
+                Resource: '*'
+        - PolicyName: DynamoDBFullAccessPolicy
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - dynamodb:PutItem
+                  - dynamodb:UpdateItem
+                  - dynamodb:GetItem
+                Resource: '*'
+
+  # ==========================================
+  # 4. CloudWatch Logs Groups
+  # ==========================================
+  OrderLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: /ecs/order-worker
+      RetentionInDays: 30
+
+  InventoryLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: /ecs/inventory-worker
+      RetentionInDays: 30
+
+  PaymentLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: /ecs/payment-worker
+      RetentionInDays: 30
+
+  NotificationLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: /ecs/notification-worker
+      RetentionInDays: 30
+
+  # ==========================================
+  # 5. Task Definitions (容器規格定義)
+  # ==========================================
+  OrderSuccessTaskDef:
+    Type: AWS::ECS::TaskDefinition
+    Properties:
+      Family: order-success-worker-task
+      Cpu: '256'
+      Memory: '512'
+      NetworkMode: awsvpc
+      RequiresCompatibilities: [FARGATE]
+      ExecutionRoleArn: !GetAtt ECSTaskExecutionRole.Arn
+      TaskRoleArn: !GetAtt MicroservicesTaskRole.Arn
+      ContainerDefinitions:
+        - Name: order-success-worker
+          Image: 315224414670.dkr.ecr.ap-southeast-2.amazonaws.com/ecomm/order-success-worker:latest
+          Essential: true
+          LogConfiguration:
+            LogDriver: awslogs
+            Options:
+              awslogs-group: !Ref OrderLogGroup
+              awslogs-region: !Ref AWS::Region
+              awslogs-stream-prefix: ecs
+
+  OrderFailedTaskDef:
+    Type: AWS::ECS::TaskDefinition
+    Properties:
+      Family: order-failed-worker-task
+      Cpu: '256'
+      Memory: '512'
+      NetworkMode: awsvpc
+      RequiresCompatibilities: [FARGATE]
+      ExecutionRoleArn: !GetAtt ECSTaskExecutionRole.Arn
+      TaskRoleArn: !GetAtt MicroservicesTaskRole.Arn
+      ContainerDefinitions:
+        - Name: order-failed-worker
+          Image: 315224414670.dkr.ecr.ap-southeast-2.amazonaws.com/ecomm/order-failed-worker:latest
+          Essential: true
+          LogConfiguration:
+            LogDriver: awslogs
+            Options:
+              awslogs-group: !Ref OrderLogGroup
+              awslogs-region: !Ref AWS::Region
+              awslogs-stream-prefix: ecs
+
+  InventoryCreatedTaskDef:
+    Type: AWS::ECS::TaskDefinition
+    Properties:
+      Family: inventory-created-worker-task
+      Cpu: '256'
+      Memory: '512'
+      NetworkMode: awsvpc
+      RequiresCompatibilities: [FARGATE]
+      ExecutionRoleArn: !GetAtt ECSTaskExecutionRole.Arn
+      TaskRoleArn: !GetAtt MicroservicesTaskRole.Arn
+      ContainerDefinitions:
+        - Name: inventory-created-worker
+          Image: 315224414670.dkr.ecr.ap-southeast-2.amazonaws.com/ecomm/inventory-created-worker:latest
+          Essential: true
+          LogConfiguration:
+            LogDriver: awslogs
+            Options:
+              awslogs-group: !Ref InventoryLogGroup
+              awslogs-region: !Ref AWS::Region
+              awslogs-stream-prefix: ecs
+
+  InventoryFailedTaskDef:
+    Type: AWS::ECS::TaskDefinition
+    Properties:
+      Family: inventory-failed-worker-task
+      Cpu: '256'
+      Memory: '512'
+      NetworkMode: awsvpc
+      RequiresCompatibilities: [FARGATE]
+      ExecutionRoleArn: !GetAtt ECSTaskExecutionRole.Arn
+      TaskRoleArn: !GetAtt MicroservicesTaskRole.Arn
+      ContainerDefinitions:
+        - Name: inventory-failed-worker
+          Image: 315224414670.dkr.ecr.ap-southeast-2.amazonaws.com/ecomm/inventory-failed-worker:latest
+          Essential: true
+          LogConfiguration:
+            LogDriver: awslogs
+            Options:
+              awslogs-group: !Ref InventoryLogGroup
+              awslogs-region: !Ref AWS::Region
+              awslogs-stream-prefix: ecs
+
+  PaymentTaskDef:
+    Type: AWS::ECS::TaskDefinition
+    Properties:
+      Family: payment-worker-task
+      Cpu: '256'
+      Memory: '512'
+      NetworkMode: awsvpc
+      RequiresCompatibilities: [FARGATE]
+      ExecutionRoleArn: !GetAtt ECSTaskExecutionRole.Arn
+      TaskRoleArn: !GetAtt MicroservicesTaskRole.Arn
+      ContainerDefinitions:
+        - Name: payment-worker
+          Image: 315224414670.dkr.ecr.ap-southeast-2.amazonaws.com/ecomm/payment-worker:latest
+          Essential: true
+          LogConfiguration:
+            LogDriver: awslogs
+            Options:
+              awslogs-group: !Ref PaymentLogGroup
+              awslogs-region: !Ref AWS::Region
+              awslogs-stream-prefix: ecs
+
+  NotificationCompletedTaskDef:
+    Type: AWS::ECS::TaskDefinition
+    Properties:
+      Family: notification-completed-worker-task
+      Cpu: '256'
+      Memory: '512'
+      NetworkMode: awsvpc
+      RequiresCompatibilities: [FARGATE]
+      ExecutionRoleArn: !GetAtt ECSTaskExecutionRole.Arn
+      TaskRoleArn: !GetAtt MicroservicesTaskRole.Arn
+      ContainerDefinitions:
+        - Name: notification-completed-worker
+          Image: 315224414670.dkr.ecr.ap-southeast-2.amazonaws.com/ecomm/notification-completed-worker:latest
+          Essential: true
+          LogConfiguration:
+            LogDriver: awslogs
+            Options:
+              awslogs-group: !Ref NotificationLogGroup
+              awslogs-region: !Ref AWS::Region
+              awslogs-stream-prefix: ecs
+
+  NotificationCancelledTaskDef:
+    Type: AWS::ECS::TaskDefinition
+    Properties:
+      Family: notification-Cancelled-worker-task
+      Cpu: '256'
+      Memory: '512'
+      NetworkMode: awsvpc
+      RequiresCompatibilities: [FARGATE]
+      ExecutionRoleArn: !GetAtt ECSTaskExecutionRole.Arn
+      TaskRoleArn: !GetAtt MicroservicesTaskRole.Arn
+      ContainerDefinitions:
+        - Name: notification-Cancelled-worker
+          Image: 315224414670.dkr.ecr.ap-southeast-2.amazonaws.com/ecomm/notification-cancelled-worker:latest
+          Essential: true
+          LogConfiguration:
+            LogDriver: awslogs
+            Options:
+              awslogs-group: !Ref NotificationLogGroup
+              awslogs-region: !Ref AWS::Region
+              awslogs-stream-prefix: ecs
+
+  # ==========================================
+  # 6. ECS Services (常駐背景運行服務)
+  # ==========================================
+  OrderSuccessService:
+    Type: AWS::ECS::Service
+    Properties:
+      Cluster: !Ref MicroservicesCluster
+      ServiceName: order-success-worker-service
+      TaskDefinition: !Ref OrderSuccessTaskDef
+      DesiredCount: 1
+      LaunchType: FARGATE
+      NetworkConfiguration:
+        AwsvpcConfiguration:
+          AssignPublicIp: ENABLED
+          Subnets: [!ImportValue ECommPublicSubnetId]
+          SecurityGroups: [!ImportValue ECommOrderWorkerSgId]
+
+  OrderFailedService:
+    Type: AWS::ECS::Service
+    Properties:
+      Cluster: !Ref MicroservicesCluster
+      ServiceName: order-failed-worker-service
+      TaskDefinition: !Ref OrderFailedTaskDef
+      DesiredCount: 1
+      LaunchType: FARGATE
+      NetworkConfiguration:
+        AwsvpcConfiguration:
+          AssignPublicIp: ENABLED
+          Subnets: [!ImportValue ECommPublicSubnetId]
+          SecurityGroups: [!ImportValue ECommOrderWorkerSgId]
+
+  InventoryCreatedService:
+    Type: AWS::ECS::Service
+    Properties:
+      Cluster: !Ref MicroservicesCluster
+      ServiceName: inventory-created-worker-service
+      TaskDefinition: !Ref InventoryCreatedTaskDef
+      DesiredCount: 1
+      LaunchType: FARGATE
+      NetworkConfiguration:
+        AwsvpcConfiguration:
+          AssignPublicIp: ENABLED
+          Subnets: [!ImportValue ECommPublicSubnetId]
+          SecurityGroups: [!ImportValue ECommInventoryWorkerSgId]
+
+  InventoryFailedService:
+    Type: AWS::ECS::Service
+    Properties:
+      Cluster: !Ref MicroservicesCluster
+      ServiceName: inventory-failed-worker-service
+      TaskDefinition: !Ref InventoryFailedTaskDef
+      DesiredCount: 1
+      LaunchType: FARGATE
+      NetworkConfiguration:
+        AwsvpcConfiguration:
+          AssignPublicIp: ENABLED
+          Subnets: [!ImportValue ECommPublicSubnetId]
+          SecurityGroups: [!ImportValue ECommInventoryWorkerSgId]
+
+  PaymentService:
+    Type: AWS::ECS::Service
+    Properties:
+      Cluster: !Ref MicroservicesCluster
+      ServiceName: payment-worker-service
+      TaskDefinition: !Ref PaymentTaskDef
+      DesiredCount: 1
+      LaunchType: FARGATE
+      NetworkConfiguration:
+        AwsvpcConfiguration:
+          AssignPublicIp: ENABLED
+          Subnets: [!ImportValue ECommPublicSubnetId]
+          SecurityGroups: [!ImportValue ECommPaymentWorkerSgId]
+
+  NotificationCompletedService:
+    Type: AWS::ECS::Service
+    Properties:
+      Cluster: !Ref MicroservicesCluster
+      ServiceName: notification-completed-worker-service
+      TaskDefinition: !Ref NotificationCompletedTaskDef
+      DesiredCount: 1
+      LaunchType: FARGATE
+      NetworkConfiguration:
+        AwsvpcConfiguration:
+          AssignPublicIp: ENABLED
+          Subnets: [!ImportValue ECommPublicSubnetId]
+          SecurityGroups: [!ImportValue ECommNotificationWorkerSgId]
+  
+  NotificationCancelledService:
+    Type: AWS::ECS::Service
+    Properties:
+      Cluster: !Ref MicroservicesCluster
+      ServiceName: notification-Cancelled-worker-service
+      TaskDefinition: !Ref NotificationCancelledTaskDef
+      DesiredCount: 1
+      LaunchType: FARGATE
+      NetworkConfiguration:
+        AwsvpcConfiguration:
+          AssignPublicIp: ENABLED
+          Subnets: [!ImportValue ECommPublicSubnetId]
+          SecurityGroups: [!ImportValue ECommNotificationWorkerSgId]          
