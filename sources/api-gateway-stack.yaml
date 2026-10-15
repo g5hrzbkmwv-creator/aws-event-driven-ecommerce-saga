@@ -1,1 +1,227 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: API Gateway and Lambda Ingress Stack for Order Creation
 
+# ==========================================
+# 參數宣告 (部署時手動輸入或由指令帶入)
+# ==========================================
+Parameters:
+  OrderEventTopicArnParam:
+    Type: String
+    Description: The ARN of the Order Events SNS Topic (e.g., arn:aws:sns:...)
+
+Resources:
+  # ==========================================
+  # 1. Lambda Execution Role (賦予 Lambda 寫入 SNS 的權限)
+  # ==========================================
+  LambdaExecutionRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: lambda.amazonaws.com
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
+      Policies:
+        - PolicyName: LambdaSnsPublishPolicy
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - sns:Publish
+                Resource: !Ref OrderEventTopicArnParam  # 👈 直接引用參數傳入的 ARN
+
+  OrderCheckLambdaExecutionRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: lambda.amazonaws.com
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
+      Policies:
+        - PolicyName: LambdaDynamoDBAccessPolicy
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - dynamodb:GetItem
+                Resource: '*'
+
+  # ==========================================
+  # 2. Lambda Function (處理請求並發布到 SNS)
+  # ==========================================
+  OrderIngressLambda:
+    Type: AWS::Lambda::Function
+    Properties:
+      FunctionName: order-ingress-handler
+      Runtime: python3.11
+      Handler: index.lambda_handler
+      Role: !GetAtt LambdaExecutionRole.Arn
+      Environment:
+        Variables:
+          ORDER_TOPIC_ARN: !Ref OrderEventTopicArnParam  # 👈 直接引用參數傳入的 ARN
+      Code:
+        ZipFile: |
+          import json
+          import os
+          import boto3
+
+          sns_client = boto3.client('sns', region_name=os.getenv('AWS_REGION', 'ap-southeast-2')
+          ORDER_TOPIC_ARN = os.environ['ORDER_TOPIC_ARN', 'arn:aws:sns:ap-southeast-2:315224414670:order-events-topic']
+
+          def lambda_handler(event, context):
+              try:
+                  body = json.loads(event.get('body', '{}'))
+                  order_id = body.get('order_id')
+                  user_id = body.get('user_id')
+                  items = body.get('items', [])
+
+                  if not order_id or not items:
+                      return {
+                          'statusCode': 400,
+                          'body': json.dumps({'error': 'Missing order_id or items'})
+                      }
+
+                  payload = {
+                      'order_id': order_id,
+                      'user_id': user_id,
+                      'items': items
+                  }
+
+                  sns_client.publish(
+                      TopicArn=ORDER_TOPIC_ARN,
+                      Message=json.dumps(payload),
+                      MessageAttributes={
+                          'event_type': {'DataType': 'String', 'StringValue': 'Created'}
+                      }
+                  )
+
+                  return {
+                      'statusCode': 202,
+                      'body': json.dumps({'message': 'Order accepted and processing started', 'order_id': order_id})
+                  }
+              except Exception as e:
+                  return {
+                      'statusCode': 500,
+                      'body': json.dumps({'error': str(e)})
+                  }
+
+  OrderCheckLambda:
+    Type: AWS::Lambda::Function
+    Properties:
+      FunctionName: order-check-handler
+      Runtime: python3.11
+      Handler: index.lambda_handler
+      Role: !GetAtt OrderCheckLambdaExecutionRole.Arn
+      Code:
+        ZipFile: | 
+          import json
+          import os
+          import boto3
+
+          dynamodb = boto3.resource('dynamodb', region_name=os.getenv('AWS_REGION'))
+          table = dynamodb.Table(os.getenv('DYNAMODB_TABLE_NAME', 'Orders'))
+
+          def lambda_handler(event, context):
+              path_params = event.get('pathParameters') or {}
+              order_id = path_params.get('order_id')
+              
+              if not order_id:
+                  return {'statusCode': 400, 'body': json.dumps({'error': 'Missing order_id'})}
+              
+              response = table.get_item(Key={'order_id': order_id})
+              item = response.get('Item')
+              
+              if not item:
+                  return {'statusCode': 404, 'body': json.dumps({'error': 'Order not found'})}
+                  
+              return {
+                  'statusCode': 200,
+                  'headers': {'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*'},
+                  'body': json.dumps(item, default=str)
+              }
+
+  # ==========================================
+  # 3. API Gateway (HTTP API - 現代且高效能)
+  # ==========================================
+  HttpApi:
+    Type: AWS::ApiGatewayV2::Api
+    Properties:
+      Name: ecomm-order-api
+      ProtocolType: HTTP
+      CorsConfiguration:
+        AllowOrigins: ['*']
+        AllowMethods: ['POST', 'OPTIONS']
+        AllowHeaders: ['*']
+
+  # API Gateway 整合 Lambda 管道
+  ApiLambdaIntegration:
+    Type: AWS::ApiGatewayV2::Integration
+    Properties:
+      ApiId: !Ref HttpApi
+      IntegrationType: AWS_PROXY
+      IntegrationUri: !GetAtt OrderIngressLambda.Arn
+      PayloadFormatVersion: '2.0'
+
+  ApiOrderCheckLambdaIntegration:
+    Type: AWS::ApiGatewayV2::Integration
+    Properties:
+      ApiId: !Ref HttpApi
+      IntegrationType: AWS_PROXY
+      IntegrationUri: !GetAtt OrderCheckLambda.Arn
+      PayloadFormatVersion: '2.0'
+
+  # 設定路由 (POST /orders)
+  ApiRoute:
+    Type: AWS::ApiGatewayV2::Route
+    Properties:
+      ApiId: !Ref HttpApi
+      RouteKey: 'POST /orders'
+      Target: !Join ['/', ['integrations', !Ref ApiLambdaIntegration]]
+
+  ApiCheckRoute:
+    Type: AWS::ApiGatewayV2::Route
+    Properties:
+      ApiId: !Ref HttpApi
+      RouteKey: 'GET /orders/{order_id}'
+      Target: !Join ['/', ['integrations', !Ref ApiOrderCheckLambdaIntegration]]
+
+  # 自動部署階段
+  ApiStage:
+    Type: AWS::ApiGatewayV2::Stage
+    Properties:
+      ApiId: !Ref HttpApi
+      StageName: '$default'
+      AutoDeploy: true
+
+  # 賦予 API Gateway 呼叫 Lambda 的權限
+  LambdaApiGatewayPermission:
+    Type: AWS::Lambda::Permission
+    Properties:
+      Action: lambda:InvokeFunction
+      FunctionName: !Ref OrderIngressLambda
+      Principal: apigateway.amazonaws.com
+      SourceArn: !Sub 'arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${HttpApi}/*/*'
+
+  OrderCheckLambdaApiGatewayPermission:
+    Type: AWS::Lambda::Permission
+    Properties:
+      Action: lambda:InvokeFunction
+      FunctionName: !Ref OrderCheckLambda
+      Principal: apigateway.amazonaws.com
+      SourceArn: !Sub 'arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${HttpApi}/*/*'
+
+Outputs:
+  ApiEndpoint:
+    Description: API Gateway Endpoint URL for Orders
+    Value: !Sub 'https://${HttpApi}.execute-api.${AWS::Region}.amazonaws.com/orders'
