@@ -4,10 +4,10 @@ An enterprise-grade, event-driven e-commerce microservices platform built on AWS
 ---
 
 ## 📐 Activity Diagram
-![Activity Diagram](./Project2 E-com Microservice-Order Activity.drawio.png)
+<img src="./Project2 E-com Microservice-Order Activity.drawio.png" alt="Activity Diagram"/>
 
 ## 📐 System Architecture Diagram
-![System Architecture Diagram](./Project2 E-com Microservice-AWS Architecture.drawio.png)
+<img src="./Project2 E-com Microservice-AWS Architecture.drawio.png" alt="System Architecture Diagram"/>
 
 ---
 
