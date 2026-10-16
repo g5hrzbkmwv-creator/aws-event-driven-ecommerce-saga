@@ -59,7 +59,7 @@ Resources:
       QueueName: payment-failed-dlq
 
   # ==========================================
-  # Dead Letter Queue Alarm
+  # 3. Dead Letter Queue Alarm
   # ==========================================
   # 1. 建立一個專門收警報通知的 SNS Topic (可選，如果你們已經有通知用 SNS 可以共用)
   AlarmNotificationTopic:
@@ -127,7 +127,7 @@ Resources:
 
 
   # ==========================================
-  # 3. Main SQS Queues (7條專屬事件佇列)
+  # 4. Main SQS Queues (7條專屬事件佇列)
   # ==========================================
   
   # --- Order Event Queues ---
@@ -190,7 +190,7 @@ Resources:
         maxReceiveCount: 3
 
   # ==========================================
-  # 4. SNS Subscriptions (透過 FilterPolicy 導流到對應 SQS)
+  # 5. SNS Subscriptions (透過 FilterPolicy 導流到對應 SQS)
   # ==========================================
 
   # Order Topic 導流
@@ -260,7 +260,7 @@ Resources:
         event_type: [Failed]
 
   # ==========================================
-  # 5. SQS Access Policies (允許 SNS 寫入這 7 條 SQS)
+  # 6. SQS Access Policies (允許 SNS 寫入這 7 條 SQS)
   # ==========================================
   OrderCreatedQueuePolicy:
     Type: AWS::SQS::QueuePolicy
