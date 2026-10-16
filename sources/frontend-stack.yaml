@@ -11,7 +11,7 @@ Resources:
         IndexDocument: index.html
         ErrorDocument: index.html # 單頁應用 (SPA) 路由重定向
 
-  # 4. S3 Bucket Policy：只允許來自該 CloudFront OAC 的存取請求
+  # 2. S3 Bucket Policy：只允許來自該 CloudFront OAC 的存取請求
   FrontendBucketPolicy:
     Type: AWS::S3::BucketPolicy
     Properties:
@@ -29,7 +29,7 @@ Resources:
               StringEquals:
                 AWS:SourceArn: !Sub "arn:aws:cloudfront::${AWS::AccountId}:distribution/${FrontendCloudFrontDistribution}"
 
-  # 2. CloudFront Origin Access Control (OAC) 用來安全地唯讀 S3
+  # 3. CloudFront Origin Access Control (OAC) 用來安全地唯讀 S3
   CloudFrontOAC:
     Type: AWS::CloudFront::OriginAccessControl
     Properties:
@@ -39,7 +39,7 @@ Resources:
         SigningBehavior: always
         SigningProtocol: sigv4
 
-  # 3. CloudFront Distribution (CDN)
+  # 4. CloudFront Distribution (CDN)
   FrontendCloudFrontDistribution:
     Type: AWS::CloudFront::Distribution
     Properties:
