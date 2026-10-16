@@ -51,7 +51,7 @@ Resources:
       RouteTableId: !Ref PublicRouteTable
 
   # ==========================================
-  # 3. 專屬 Security Groups (各微服務獨立防護)
+  # 專屬 Security Groups (各微服務獨立防護)
   # ==========================================
   OrderWorkerSG:
     Type: AWS::EC2::SecurityGroup
@@ -101,6 +101,9 @@ Resources:
         - Key: Name
           Value: notification-worker-sg
 
+  # ==========================================
+  # DynamoDB to store orders
+  # ==========================================
   OrdersTable:
     Type: AWS::DynamoDB::Table
     Properties:
