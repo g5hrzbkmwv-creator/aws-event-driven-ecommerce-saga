@@ -26,6 +26,9 @@ Resources:
       ManagedPolicyArns:
         - arn:aws:iam::aws:policy/service-role/AmazonECSTaskExecutionRolePolicy
 
+  # ==========================================
+  # 3. IAM Roles (讀取和刪除SQS message的權限，發放Event到SNS的權限，讀取和更新DynamoDB的權限)
+  # ==========================================
   MicroservicesTaskRole:
     Type: AWS::IAM::Role
     Properties:
