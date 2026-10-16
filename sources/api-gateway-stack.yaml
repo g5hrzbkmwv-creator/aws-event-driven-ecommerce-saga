@@ -11,7 +11,7 @@ Parameters:
 
 Resources:
   # ==========================================
-  # 1. Lambda Execution Role (賦予 Lambda 寫入 SNS 的權限)
+  # 1a. Lambda Execution Role (賦予 Lambda 寫入 SNS 的權限)
   # ==========================================
   LambdaExecutionRole:
     Type: AWS::IAM::Role
@@ -35,6 +35,9 @@ Resources:
                   - sns:Publish
                 Resource: !Ref OrderEventTopicArnParam  # 👈 直接引用參數傳入的 ARN
 
+  # ==========================================
+  # 1b. Lambda Execution Role (賦予 Lambda read DynamoDB right)
+  # ==========================================
   OrderCheckLambdaExecutionRole:
     Type: AWS::IAM::Role
     Properties:
@@ -58,7 +61,7 @@ Resources:
                 Resource: '*'
 
   # ==========================================
-  # 2. Lambda Function (處理請求並發布到 SNS)
+  # 2a. Lambda Function (處理請求並發布到 SNS)
   # ==========================================
   OrderIngressLambda:
     Type: AWS::Lambda::Function
@@ -116,6 +119,9 @@ Resources:
                       'body': json.dumps({'error': str(e)})
                   }
 
+  # ==========================================
+  # 2b. Lambda Function (從DynamoDB讀取Table Orders)
+  # ==========================================
   OrderCheckLambda:
     Type: AWS::Lambda::Function
     Properties:
