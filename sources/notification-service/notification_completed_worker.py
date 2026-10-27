@@ -17,8 +17,7 @@ sqs_client = boto3.client(
 
 # 從環境變數取得 SQS 佇列 URL 與 SNS Topic ARN
 QUEUE_URL = os.getenv(
-    "PAYMENT_COMPLETED_QUEUE_URL",
-    "https://sqs.ap-southeast-2.amazonaws.com/315224414670/order-completed-queue",
+    "PAYMENT_COMPLETED_QUEUE_URL"
 )
 
 def handle_completed(order_id: str, user_id: str):
