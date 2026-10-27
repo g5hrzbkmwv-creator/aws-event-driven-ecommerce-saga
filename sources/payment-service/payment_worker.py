@@ -21,14 +21,12 @@ sns_client = boto3.client(
 
 # 💡 修正：接收來自 inventory-received-queue 的訊息
 QUEUE_URL = os.getenv(
-  "INVENTORY_RECEIVED_QUEUE_URL",
-  "https://sqs.ap-southeast-2.amazonaws.com/315224414670/inventory-received-queue"
+  "INVENTORY_RECEIVED_QUEUE_URL"
 )
 
 # 💡 修正：將付款結果發布到 payment-events-topic
 PAYMENT_TOPIC_ARN = os.getenv(
-  "PAYMENT_TOPIC_ARN",
-  "arn:aws:sns:ap-southeast-2:315224414670:payment-events-topic"
+  "PAYMENT_TOPIC_ARN"
 )
 
 def process_payment(order_id: str, user_id: str, items: list) -> bool:
