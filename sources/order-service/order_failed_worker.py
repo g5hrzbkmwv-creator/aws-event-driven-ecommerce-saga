@@ -25,12 +25,10 @@ dynamodb = boto3.resource(
 
 # 從環境變數取得 SQS 佇列 URL 與 SNS Topic ARN
 QUEUE_URL = os.getenv(
-    "INVENTORY_FAILED_QUEUE_URL",
-    "https://sqs.ap-southeast-2.amazonaws.com/315224414670/inventory-failed-queue",
+    "INVENTORY_FAILED_QUEUE_URL"
 )
 ORDER_TOPIC_ARN = os.getenv(
-    "ORDER_TOPIC_ARN",
-    "arn:aws:sns:ap-southeast-2:315224414670:order-events-topic",
+    "ORDER_TOPIC_ARN"
 )
 TABLE_ORDER_NAME = os.getenv(
     "DYNAMODB_TABLE_ORDER_NAME",
