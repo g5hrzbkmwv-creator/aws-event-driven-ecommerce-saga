@@ -18,8 +18,7 @@ sqs_client = boto3.client(
 
 # 從環境變數取得 SQS 佇列 URL 與 SNS Topic ARN
 QUEUE_URL = os.getenv(
-    "ORDER_CANCELLED_QUEUE_URL",
-    "https://sqs.ap-southeast-2.amazonaws.com/315224414670/order-cancelled-queue",
+    "ORDER_CANCELLED_QUEUE_URL"
 )
 
 def cancel_notification(order_id: str, items: list):
