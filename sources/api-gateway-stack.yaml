@@ -80,7 +80,7 @@ Resources:
           import boto3
 
           sns_client = boto3.client('sns', region_name=os.getenv('AWS_REGION', 'ap-southeast-2')
-          ORDER_TOPIC_ARN = os.environ['ORDER_TOPIC_ARN', 'arn:aws:sns:ap-southeast-2:315224414670:order-events-topic']
+          ORDER_TOPIC_ARN = os.environ['ORDER_TOPIC_ARN']
 
           def lambda_handler(event, context):
               try:
