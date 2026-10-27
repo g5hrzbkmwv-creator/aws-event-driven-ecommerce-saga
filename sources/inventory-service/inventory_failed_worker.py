@@ -21,12 +21,10 @@ sns_client = boto3.client(
 
 # 從環境變數取得 SQS 佇列 URL 與 SNS Topic ARN
 QUEUE_URL = os.getenv(
-    "PAYMENT_FAILED_QUEUE_URL",
-    "https://sqs.ap-southeast-2.amazonaws.com/315224414670/payment-failed-queue",
+    "PAYMENT_FAILED_QUEUE_URL"
 )
 INVENTORY_TOPIC_ARN = os.getenv(
-    "INVENTORY_TOPIC_ARN",
-    "arn:aws:sns:ap-southeast-2:315224414670:inventory-events-topic",
+    "INVENTORY_TOPIC_ARN"
 )
 
 def compensate_inventory(order_id: str, items: list):
